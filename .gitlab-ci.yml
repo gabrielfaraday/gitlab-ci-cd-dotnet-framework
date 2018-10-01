@@ -1,0 +1,46 @@
+variables:
+  NUGET_PATH: 'C:\Tools\Nuget\nuget.exe'
+  MSBUILD_PATH: 'C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\MSBuild\15.0\Bin\msbuild.exe'
+  XUNIT_PATH: packages\xunit.runner.console.2.3.1\tools\net452
+  UNITTEST_FOLDER: '.\tests\CiCdExample.Tests\bin\Release\'
+
+stages:
+  - build
+  - test
+  - deploy
+
+build_job:
+  stage: build
+  only:
+    - branches
+  script:
+    - '& "$env:NUGET_PATH" restore'
+    - '& "$env:MSBUILD_PATH" /p:Configuration=Release /clp:ErrorsOnly'
+    - '& "$env:MSBUILD_PATH" src\CiCdExample\CiCdExample.csproj /p:DeployOnBuild=true /p:Configuration=Release /P:PublishProfile=FolderProfile.pubxml'
+  artifacts:
+    expire_in: 2 days
+    paths:
+      - '.\src\CiCdExample\bin\Release\Publish\'
+      - '$env:UNITTEST_FOLDER'
+      - '.\$env:XUNIT_PATH\*.*'
+
+test_job:
+  stage: test
+  only:
+    - branches
+  script:
+    - '& "$env:XUNIT_PATH\xunit.console.exe" "$env:UNITTEST_FOLDER\CiCdExample.Tests.dll"'
+  dependencies:
+    - build_job
+
+deploy_job:
+  stage: deploy
+  only:
+    - branches
+  script:
+    - 'xcopy /y /s ".\src\CiCdExample\bin\Release\Publish\*.*" "C:\inetpub\wwwroot\ci-cd-example"'
+
+  dependencies:
+    - build_job
+    - test_job
+  
